@@ -1,6 +1,6 @@
 locals {
   prefix         = "cmtr-wbdw4cma-mod9"
-  location       = "East US"
+  location       = "eastus"
   rg_name        = "${local.prefix}-rg"
   vnet_name      = "${local.prefix}-vnet"
   aks_name       = "${local.prefix}-aks"
