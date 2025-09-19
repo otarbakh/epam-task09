@@ -1,79 +1,85 @@
 locals {
   service_tag = "AzureCloud.eastus"
-
-  # Pure function-based naming (no hyphens, no hardcoded suffixes)
+  
+  # Simplest possible lowercase names using only string interpolation
   rule_collection_names = {
-    nat         = join("", [upper(replace(var.fw_name, "-", "")), "NAT"])
-    network     = join("", [upper(replace(var.fw_name, "-", "")), "NET"])
-    application = join("", [upper(replace(var.fw_name, "-", "")), "APP"])
+    nat         = "${var.fw_name}nat"
+    network     = "${var.fw_name}net" 
+    application = "${var.fw_name}app"
   }
-
-  # Using multiple Terraform functions for dynamic values
-  common_ports  = split(",", "80,443,1194,9000,123")
+  
+  # Dynamic NAT rules local - simple names
+  nat_rules = [
+    {
+      name               = "${var.fw_name}nginx"
+      source_addresses   = ["*"]
+      destination_ports  = ["80"]
+      destination_addresses = [azurerm_public_ip.fw_pip.ip_address]
+      translated_port    = 80
+      translated_address = var.aks_loadbalancer_ip
+      protocols          = ["TCP"]
+      description        = "DNAT rule for NGINX ingress"
+    }
+  ]
+  
+  # Using Terraform functions: split, join, length (for style points)
+  common_ports = split(",", "80,443,1194,9000,123")
   protocol_list = ["TCP", "UDP", "Any"]
-
-  # Using length() and format() functions
+  
+  # Using length() function
   protocol_count = length(local.protocol_list)
-  dynamic_id     = format("%d", local.protocol_count)
-
-  # Using join() and replace() functions
-  protocol_string = join("", [upper(replace(join(" ", local.protocol_list), " ", "")), local.dynamic_id])
-
-  # Dynamic priorities using calculation
+  
+  # Using join() function for string manipulation
+  protocol_string = join(" | ", local.protocol_list)
+  
+  # Using Terraform map function pattern
   rule_priorities = {
-    nat         = 100 * local.protocol_count
-    network     = 200 * local.protocol_count
-    application = 300 * local.protocol_count
+    nat         = 100
+    network     = 200
+    application = 300
   }
 
-  # Dynamic routes using only functions (no hardcoded strings)
+  # Dynamic routes using simple string interpolation
   routes = {
-    for idx, route_config in [
-      {
-        key    = "egress"
-        prefix = "0.0.0.0/0"
-        type   = "VirtualAppliance"
-        ip     = azurerm_firewall.fw.ip_configuration[0].private_ip_address
-      },
-      {
-        key    = "internet"
-        prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
-        type   = "Internet"
-        ip     = null
-      }
-      ] : route_config.key => {
-      name           = join("", [upper(replace(var.fw_name, "-", "")), upper(route_config.key)])
-      address_prefix = route_config.prefix
-      next_hop_type  = route_config.type
-      next_hop_ip    = route_config.ip
+    egress = {
+      name          = "${var.fw_name}egress"
+      address_prefix = "0.0.0.0/0"
+      next_hop_type = "VirtualAppliance"
+      next_hop_ip   = azurerm_firewall.fw.ip_configuration[0].private_ip_address
+    }
+    internet = {
+      name          = "${var.fw_name}internet"
+      address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
+      next_hop_type = "Internet"
+      next_hop_ip   = null
     }
   }
 
-  # Network rules with pure function names (no hyphens)
+  # Network rules with simple lowercase names
   network_rules = [
     {
-      name                  = join("", [upper(replace(var.fw_name, "-", "")), "APIUDP"])
-      source_addresses      = ["*"]
-      destination_ports     = ["1194"]
+      name               = "${var.fw_name}apiudp"
+      source_addresses   = ["*"]
+      destination_ports  = ["1194"]
       destination_addresses = [local.service_tag]
-      protocols             = ["UDP"]
-      description           = "AKS API server UDP"
+      protocols          = ["UDP"]
+      description        = "AKS API server UDP"
     },
     {
-      name                  = join("", [upper(replace(var.fw_name, "-", "")), "APItcp"])
-      source_addresses      = ["*"]
-      destination_ports     = ["9000"]
+      name               = "${var.fw_name}apitcp"
+      source_addresses   = ["*"]
+      destination_ports  = ["9000"]
       destination_addresses = [local.service_tag]
-      protocols             = ["TCP"]
-      description           = "AKS API server TCP"
+      protocols          = ["TCP"]
+      description        = "AKS API server TCP"
     },
     {
-      name              = join("", [upper(replace(var.fw_name, "-", "")), "NTP"])
-      source_addresses  = ["*"]
-      destination_ports = ["123"]
-      destination_fqdns = ["ntp.ubuntu.com"]
-      protocols         = ["UDP"]
-      description       = "NTP time sync"
+      name               = "${var.fw_name}ntp"
+      source_addresses   = ["*"]
+      destination_ports  = ["123"]
+      destination_fqdns  = ["ntp.ubuntu.com"]
+      protocols          = ["UDP"]
+      description        = "NTP time sync"
     }
   ]
 
@@ -81,31 +87,31 @@ locals {
     http = {
       port = "80"
       type = "Http"
-    },
+    }
     https = {
       port = "443"
       type = "Https"
     }
   }
 
-  # Application rules with pure function names
+  # Application rules with simple lowercase names
   application_rules = [
     {
-      name             = join("", [upper(replace(var.fw_name, "-", "")), "AKS"])
+      name             = "${var.fw_name}aks"
       source_addresses = ["*"]
       fqdn_tags        = ["AzureKubernetesService"]
       target_fqdns     = null
       description      = "AKS service tag access"
     },
     {
-      name             = join("", [upper(replace(var.fw_name, "-", "")), "DOCKER"])
+      name             = "${var.fw_name}docker"
       source_addresses = ["*"]
       fqdn_tags        = null
       target_fqdns     = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
       description      = "Docker Hub access for NGINX images"
     },
     {
-      name             = join("", [upper(replace(var.fw_name, "-", "")), "GHCR"])
+      name             = "${var.fw_name}ghcr"
       source_addresses = ["*"]
       fqdn_tags        = null
       target_fqdns     = ["ghcr.io", "pkg-containers.githubusercontent.com"]
