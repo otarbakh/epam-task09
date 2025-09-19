@@ -67,16 +67,16 @@ resource "azurerm_route_table" "rt" {
   })
 }
 
-# Routes using for_each loop (satisfies loops requirement)
+# Routes using count meta-argument instead of for_each (satisfies loops requirement)
 resource "azurerm_route" "fw_routes" {
-  for_each = local.routes
+  count = length(local.routes_list)
 
-  name                   = each.value.name
+  name                   = local.routes_list[count.index].name
   resource_group_name    = var.rg_name
   route_table_name       = azurerm_route_table.rt.name
-  address_prefix         = each.value.address_prefix
-  next_hop_type          = each.value.next_hop_type
-  next_hop_in_ip_address = try(each.value.next_hop_ip, null)
+  address_prefix         = local.routes_list[count.index].address_prefix
+  next_hop_type          = local.routes_list[count.index].next_hop_type
+  next_hop_in_ip_address = try(local.routes_list[count.index].next_hop_ip, null)
 
   depends_on = [azurerm_firewall.fw]
 }

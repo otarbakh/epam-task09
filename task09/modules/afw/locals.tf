@@ -8,6 +8,22 @@ locals {
     application = var.fw_name
   }
 
+  # Routes as LIST for count meta-argument (not map for for_each)
+  routes_list = [
+    {
+      name           = "${var.fw_name}-egress"
+      address_prefix = "0.0.0.0/0"
+      next_hop_type  = "VirtualAppliance"
+      next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
+    },
+    {
+      name           = "${var.fw_name}-internet"
+      address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
+      next_hop_type  = "Internet"
+      next_hop_ip    = null
+    }
+  ]
+
   # Using Terraform functions: split, join, length (for style points)
   common_ports  = split(",", "80,443,1194,9000,123")
   protocol_list = ["TCP", "UDP", "Any"]
@@ -23,21 +39,5 @@ locals {
     nat         = 100
     network     = 200
     application = 300
-  }
-
-  # Dynamic routes using for_each (keep this for loops requirement)
-  routes = {
-    egress = {
-      name           = "${var.fw_name}-egress"
-      address_prefix = "0.0.0.0/0"
-      next_hop_type  = "VirtualAppliance"
-      next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
-    }
-    internet = {
-      name           = "${var.fw_name}-internet"
-      address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
-      next_hop_type  = "Internet"
-      next_hop_ip    = null
-    }
   }
 }
