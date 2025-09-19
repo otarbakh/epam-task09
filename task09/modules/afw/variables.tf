@@ -73,3 +73,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "route_suffix_egress" {
+  type    = string
+  default = "egress"
+}
+
+variable "route_suffix_internet" {
+  type    = string
+  default = "internet"
+}

@@ -5,7 +5,7 @@ data "azurerm_subnet" "aks_snet" {
   resource_group_name  = var.rg_name
 }
 
-# Firewall Subnet (no tags supported)
+# Firewall Subnet
 resource "azurerm_subnet" "fw_subnet" {
   name                 = var.fw_snet_name
   resource_group_name  = var.rg_name
@@ -13,7 +13,7 @@ resource "azurerm_subnet" "fw_subnet" {
   address_prefixes     = [var.fw_snet_prefix]
 }
 
-# Public IP with lifecycle meta-argument (required) and tags
+# Public IP
 resource "azurerm_public_ip" "fw_pip" {
   name                = var.fw_pip_name
   resource_group_name = var.rg_name
@@ -31,7 +31,7 @@ resource "azurerm_public_ip" "fw_pip" {
   })
 }
 
-# Azure Firewall with dynamic block (keep this one)
+# Azure Firewall
 resource "azurerm_firewall" "fw" {
   name                = var.fw_name
   resource_group_name = var.rg_name
@@ -55,7 +55,7 @@ resource "azurerm_firewall" "fw" {
   })
 }
 
-# Route Table with tags
+# Route Table
 resource "azurerm_route_table" "rt" {
   name                = var.rt_name
   resource_group_name = var.rg_name
@@ -67,16 +67,16 @@ resource "azurerm_route_table" "rt" {
   })
 }
 
-# Routes using count meta-argument instead of for_each (satisfies loops requirement)
+# Routes (count + variables only)
 resource "azurerm_route" "fw_routes" {
-  count = length(local.routes_list)
+  count = length(local.route_suffixes)
 
-  name                   = local.routes_list[count.index].name
+  name                   = "${var.fw_name}-${local.route_suffixes[count.index]}"
   resource_group_name    = var.rg_name
   route_table_name       = azurerm_route_table.rt.name
-  address_prefix         = local.routes_list[count.index].address_prefix
-  next_hop_type          = local.routes_list[count.index].next_hop_type
-  next_hop_in_ip_address = try(local.routes_list[count.index].next_hop_ip, null)
+  address_prefix         = count.index == 0 ? "0.0.0.0/0" : "${azurerm_public_ip.fw_pip.ip_address}/32"
+  next_hop_type          = count.index == 0 ? "VirtualAppliance" : "Internet"
+  next_hop_in_ip_address = count.index == 0 ? azurerm_firewall.fw.ip_configuration[0].private_ip_address : null
 
   depends_on = [azurerm_firewall.fw]
 }
@@ -89,7 +89,7 @@ resource "azurerm_subnet_route_table_association" "aks_assoc" {
   depends_on = [azurerm_route.fw_routes]
 }
 
-# STATIC NAT Rule Collection - NO dynamic blocks
+# NAT Rule Collection
 resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
   name                = local.rule_collection_names.nat
   azure_firewall_name = azurerm_firewall.fw.name
@@ -97,7 +97,6 @@ resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
   priority            = local.rule_priorities.nat
   action              = "Dnat"
 
-  # Static rule block instead of dynamic
   rule {
     name                  = "${var.fw_name}-nginx"
     source_addresses      = ["*"]
@@ -111,7 +110,7 @@ resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
   depends_on = [azurerm_firewall.fw]
 }
 
-# STATIC Network Rule Collection - NO dynamic blocks
+# Network Rule Collection
 resource "azurerm_firewall_network_rule_collection" "net_coll" {
   name                = local.rule_collection_names.network
   azure_firewall_name = azurerm_firewall.fw.name
@@ -119,7 +118,6 @@ resource "azurerm_firewall_network_rule_collection" "net_coll" {
   priority            = local.rule_priorities.network
   action              = "Allow"
 
-  # Static rule blocks instead of dynamic
   rule {
     name                  = "${var.fw_name}-apiudp"
     source_addresses      = ["*"]
@@ -147,7 +145,7 @@ resource "azurerm_firewall_network_rule_collection" "net_coll" {
   depends_on = [azurerm_firewall.fw]
 }
 
-# STATIC Application Rule Collection - NO dynamic blocks
+# Application Rule Collection
 resource "azurerm_firewall_application_rule_collection" "app_coll" {
   name                = local.rule_collection_names.application
   azure_firewall_name = azurerm_firewall.fw.name
@@ -155,7 +153,6 @@ resource "azurerm_firewall_application_rule_collection" "app_coll" {
   priority            = local.rule_priorities.application
   action              = "Allow"
 
-  # Static rule blocks instead of dynamic
   rule {
     name             = "${var.fw_name}-aks"
     source_addresses = ["*"]

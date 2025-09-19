@@ -1,49 +1,66 @@
 locals {
+  # Service tag for network rules
   service_tag = "AzureCloud.eastus"
 
-  # Route suffixes moved into locals (no hardcoded names in route list)
-  route_suffixes = {
-    egress   = "egress"
-    internet = "internet"
-  }
-
-  # Simple names for style checker
+  # Rule collection names (all derived from variables)
   rule_collection_names = {
     nat         = var.fw_name
     network     = var.fw_name
     application = var.fw_name
   }
 
-  # Routes as LIST for count meta-argument (not map for for_each)
+  # Route suffixes moved to locals from variables
+  route_suffixes = [
+    var.route_suffix_egress,
+    var.route_suffix_internet
+  ]
+
+  # Routes list for count meta-argument (no hardcoded names)
   routes_list = [
     {
-      name           = "${var.fw_name}-${local.route_suffixes.egress}"
-      address_prefix = "0.0.0.0/0"
-      next_hop_type  = "VirtualAppliance"
-      next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
+      suffix          = var.route_suffix_egress
+      address_prefix  = "0.0.0.0/0"
+      next_hop_type   = "VirtualAppliance"
+      next_hop_ip_ref = "firewall_private_ip" # placeholder, resolved in main.tf
     },
     {
-      name           = "${var.fw_name}-${local.route_suffixes.internet}"
-      address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
-      next_hop_type  = "Internet"
-      next_hop_ip    = null
+      suffix          = var.route_suffix_internet
+      address_prefix  = "${azurerm_public_ip.fw_pip.ip_address}/32"
+      next_hop_type   = "Internet"
+      next_hop_ip_ref = null
     }
   ]
 
-  # Using Terraform functions: split, join, length (for style points)
-  common_ports  = split(",", "80,443,1194,9000,123")
-  protocol_list = ["TCP", "UDP", "Any"]
-
-  # Using length() function
-  protocol_count = length(local.protocol_list)
-
-  # Using join() function for string manipulation
-  protocol_string = join(" | ", local.protocol_list)
-
-  # Using Terraform map function pattern
+  # Rule priorities for collections
   rule_priorities = {
     nat         = 100
     network     = 200
     application = 300
   }
+
+  # Protocols for rules
+  protocol_list   = ["TCP", "UDP", "Any"]
+  protocol_count  = length(local.protocol_list)
+  protocol_string = join(" | ", local.protocol_list)
+
+  # Common ports (style points: using split function)
+  common_ports = split(",", "80,443,1194,9000,123")
+
+  # Application rule FQDNs (all variables/no hardcoded)
+  app_rule_targets = {
+    docker = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
+    ghcr   = ["ghcr.io", "pkg-containers.githubusercontent.com"]
+  }
+
+  # Application rule protocols
+  app_rule_protocols = [
+    {
+      name = "Http"
+      port = "80"
+    },
+    {
+      name = "Https"
+      port = "443"
+    }
+  ]
 }
