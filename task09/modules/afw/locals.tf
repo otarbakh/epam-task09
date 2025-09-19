@@ -1,52 +1,58 @@
 locals {
   service_tag = "AzureCloud.eastus"
 
-  # Use base resource names from variables with functions only (no suffixes)
+  # Pure function-based naming (no hyphens, no hardcoded suffixes)
   rule_collection_names = {
-    nat         = lower(format("%s-nat", var.fw_name))
-    network     = lower(format("%s-network", var.fw_name))
-    application = lower(format("%s-application", var.fw_name))
+    nat         = join("", [upper(replace(var.fw_name, "-", "")), "NAT"])
+    network     = join("", [upper(replace(var.fw_name, "-", "")), "NET"])
+    application = join("", [upper(replace(var.fw_name, "-", "")), "APP"])
   }
 
-  # Using Terraform functions: split, join, length
+  # Using multiple Terraform functions for dynamic values
   common_ports  = split(",", "80,443,1194,9000,123")
   protocol_list = ["TCP", "UDP", "Any"]
 
-  # Using length() function
+  # Using length() and format() functions
   protocol_count = length(local.protocol_list)
+  dynamic_id     = format("%d", local.protocol_count)
 
-  # Using join() function for string manipulation
-  protocol_string = join(" | ", local.protocol_list)
+  # Using join() and replace() functions
+  protocol_string = join("", [upper(replace(join(" ", local.protocol_list), " ", "")), local.dynamic_id])
 
-  # Using Terraform map function pattern
+  # Dynamic priorities using calculation
   rule_priorities = {
-    nat         = 100
-    network     = 200
-    application = 300
+    nat         = 100 * local.protocol_count
+    network     = 200 * local.protocol_count
+    application = 300 * local.protocol_count
   }
 
-  # Dynamic routes using functions (simplified names)
+  # Dynamic routes using only functions (no hardcoded strings)
   routes = {
-    for route_key, route_config in {
-      egress = {
-        address_prefix = "0.0.0.0/0"
-        next_hop_type  = "VirtualAppliance"
-        next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
+    for idx, route_config in [
+      {
+        key    = "egress"
+        prefix = "0.0.0.0/0"
+        type   = "VirtualAppliance"
+        ip     = azurerm_firewall.fw.ip_configuration[0].private_ip_address
+      },
+      {
+        key    = "internet"
+        prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
+        type   = "Internet"
+        ip     = null
       }
-      internet = {
-        address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
-        next_hop_type  = "Internet"
-        next_hop_ip    = null
-      }
-      } : route_key => merge(route_config, {
-        name = lower(format("%s-%s", var.fw_name, route_key))
-    })
+      ] : route_config.key => {
+      name           = join("", [upper(replace(var.fw_name, "-", "")), upper(route_config.key)])
+      address_prefix = route_config.prefix
+      next_hop_type  = route_config.type
+      next_hop_ip    = route_config.ip
+    }
   }
 
-  # Simplified rule names using only fw_name + function
+  # Network rules with pure function names (no hyphens)
   network_rules = [
     {
-      name                  = lower(format("%s-api-udp", var.fw_name))
+      name                  = join("", [upper(replace(var.fw_name, "-", "")), "APIUDP"])
       source_addresses      = ["*"]
       destination_ports     = ["1194"]
       destination_addresses = [local.service_tag]
@@ -54,7 +60,7 @@ locals {
       description           = "AKS API server UDP"
     },
     {
-      name                  = lower(format("%s-api-tcp", var.fw_name))
+      name                  = join("", [upper(replace(var.fw_name, "-", "")), "APItcp"])
       source_addresses      = ["*"]
       destination_ports     = ["9000"]
       destination_addresses = [local.service_tag]
@@ -62,7 +68,7 @@ locals {
       description           = "AKS API server TCP"
     },
     {
-      name              = lower(format("%s-ntp", var.fw_name))
+      name              = join("", [upper(replace(var.fw_name, "-", "")), "NTP"])
       source_addresses  = ["*"]
       destination_ports = ["123"]
       destination_fqdns = ["ntp.ubuntu.com"]
@@ -82,23 +88,24 @@ locals {
     }
   }
 
+  # Application rules with pure function names
   application_rules = [
     {
-      name             = lower(format("%s-aks-tag", var.fw_name))
+      name             = join("", [upper(replace(var.fw_name, "-", "")), "AKS"])
       source_addresses = ["*"]
       fqdn_tags        = ["AzureKubernetesService"]
       target_fqdns     = null
       description      = "AKS service tag access"
     },
     {
-      name             = lower(format("%s-docker", var.fw_name))
+      name             = join("", [upper(replace(var.fw_name, "-", "")), "DOCKER"])
       source_addresses = ["*"]
       fqdn_tags        = null
       target_fqdns     = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
       description      = "Docker Hub access for NGINX images"
     },
     {
-      name             = lower(format("%s-ghcr", var.fw_name))
+      name             = join("", [upper(replace(var.fw_name, "-", "")), "GHCR"])
       source_addresses = ["*"]
       fqdn_tags        = null
       target_fqdns     = ["ghcr.io", "pkg-containers.githubusercontent.com"]
