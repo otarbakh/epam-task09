@@ -73,7 +73,3 @@ variable "tags" {
   default     = {}
 }
 
-variable "prefix" {
-  type        = string
-  description = "Common prefix for resource naming"
-}

@@ -26,9 +26,7 @@ locals {
 
 # Enhanced module call with depends_on and count (demonstrates loops)
 module "afw" {
-  source = "./modules/afw"
-
-  prefix              = local.prefix
+  source              = "./modules/afw"
   rg_name             = data.azurerm_resource_group.rg.name
   location            = local.location
   vnet_name           = data.azurerm_virtual_network.vnet.name
