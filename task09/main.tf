@@ -27,7 +27,7 @@ locals {
 # Enhanced module call with depends_on and count (demonstrates loops)
 module "afw" {
   source = "./modules/afw"
-  count  = 1 # Demonstrates count meta-argument
+ 
 
   rg_name             = data.azurerm_resource_group.rg.name
   location            = local.location
