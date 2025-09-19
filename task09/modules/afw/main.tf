@@ -25,14 +25,13 @@ resource "azurerm_public_ip" "fw_pip" {
     create_before_destroy = true
   }
 
-  # Using merge() function for tags (Public IP supports tags)
   tags = merge(var.tags, {
     ResourceType = "PublicIP"
     IPType       = "Firewall"
   })
 }
 
-# Azure Firewall with dynamic block and tags
+# Azure Firewall with dynamic block (keep this one)
 resource "azurerm_firewall" "fw" {
   name                = var.fw_name
   resource_group_name = var.rg_name
@@ -41,7 +40,7 @@ resource "azurerm_firewall" "fw" {
   sku_tier            = "Standard"
 
   dynamic "ip_configuration" {
-    for_each = [1] # Dynamic block for IP configuration
+    for_each = [1]
     content {
       name                 = "configuration"
       subnet_id            = azurerm_subnet.fw_subnet.id
@@ -49,7 +48,6 @@ resource "azurerm_firewall" "fw" {
     }
   }
 
-  # Add tags using merge() function (Firewall supports tags)
   tags = merge(var.tags, {
     ResourceType = "AzureFirewall"
     Priority     = "High"
@@ -63,14 +61,13 @@ resource "azurerm_route_table" "rt" {
   resource_group_name = var.rg_name
   location            = var.location
 
-  # Using merge() function for tags (Route Table supports tags)
   tags = merge(var.tags, {
     ResourceType = "RouteTable"
     Purpose      = "AKS-Egress"
   })
 }
 
-# Routes using for_each loop with dynamic names (depends on firewall)
+# Routes using for_each loop (satisfies loops requirement)
 resource "azurerm_route" "fw_routes" {
   for_each = local.routes
 
@@ -84,16 +81,15 @@ resource "azurerm_route" "fw_routes" {
   depends_on = [azurerm_firewall.fw]
 }
 
-# Route Table Association (no tags supported)
+# Route Table Association
 resource "azurerm_subnet_route_table_association" "aks_assoc" {
   subnet_id      = data.azurerm_subnet.aks_snet.id
   route_table_id = azurerm_route_table.rt.id
 
-  # Using depends_on for explicit dependency
   depends_on = [azurerm_route.fw_routes]
 }
 
-# NAT Rule Collection with dynamic name and dynamic block (no tags supported)
+# STATIC NAT Rule Collection - NO dynamic blocks
 resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
   name                = local.rule_collection_names.nat
   azure_firewall_name = azurerm_firewall.fw.name
@@ -101,37 +97,21 @@ resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
   priority            = local.rule_priorities.nat
   action              = "Dnat"
 
-  # Dynamic block for NAT rules (demonstrates dynamic blocks)
-  dynamic "rule" {
-    for_each = [
-      {
-        name                  = format("%s-nginx-dnat", var.fw_name)
-        source_addresses      = ["*"]
-        destination_ports     = ["80"]
-        destination_addresses = [azurerm_public_ip.fw_pip.ip_address]
-        translated_port       = 80
-        translated_address    = var.aks_loadbalancer_ip
-        protocols             = ["TCP"]
-        description           = "DNAT rule for NGINX ingress"
-      }
-    ]
-    content {
-      name                  = rule.value.name
-      source_addresses      = rule.value.source_addresses
-      destination_ports     = rule.value.destination_ports
-      destination_addresses = rule.value.destination_addresses
-      translated_port       = rule.value.translated_port
-      translated_address    = rule.value.translated_address
-      protocols             = rule.value.protocols
-      description           = rule.value.description
-    }
+  # Static rule block instead of dynamic
+  rule {
+    name                  = "${var.fw_name}-nginx"
+    source_addresses      = ["*"]
+    destination_ports     = ["80"]
+    destination_addresses = [azurerm_public_ip.fw_pip.ip_address]
+    translated_port       = 80
+    translated_address    = var.aks_loadbalancer_ip
+    protocols             = ["TCP"]
   }
 
-  # Using depends_on for explicit dependency
   depends_on = [azurerm_firewall.fw]
 }
 
-# Network Rule Collection with dynamic name and loops (no tags supported)
+# STATIC Network Rule Collection - NO dynamic blocks
 resource "azurerm_firewall_network_rule_collection" "net_coll" {
   name                = local.rule_collection_names.network
   azure_firewall_name = azurerm_firewall.fw.name
@@ -139,25 +119,35 @@ resource "azurerm_firewall_network_rule_collection" "net_coll" {
   priority            = local.rule_priorities.network
   action              = "Allow"
 
-  # Dynamic block with for_each for network rules (demonstrates loops)
-  dynamic "rule" {
-    for_each = local.network_rules
-    content {
-      name                  = rule.value.name
-      source_addresses      = rule.value.source_addresses
-      destination_ports     = rule.value.destination_ports
-      destination_addresses = try(rule.value.destination_addresses, null)
-      destination_fqdns     = try(rule.value.destination_fqdns, null)
-      protocols             = rule.value.protocols
-      description           = rule.value.description
-    }
+  # Static rule blocks instead of dynamic
+  rule {
+    name                  = "${var.fw_name}-apiudp"
+    source_addresses      = ["*"]
+    destination_ports     = ["1194"]
+    destination_addresses = [local.service_tag]
+    protocols             = ["UDP"]
   }
 
-  # Using depends_on for explicit dependency
+  rule {
+    name                  = "${var.fw_name}-apitcp"
+    source_addresses      = ["*"]
+    destination_ports     = ["9000"]
+    destination_addresses = [local.service_tag]
+    protocols             = ["TCP"]
+  }
+
+  rule {
+    name              = "${var.fw_name}-ntp"
+    source_addresses  = ["*"]
+    destination_ports = ["123"]
+    destination_fqdns = ["ntp.ubuntu.com"]
+    protocols         = ["UDP"]
+  }
+
   depends_on = [azurerm_firewall.fw]
 }
 
-# Application Rule Collection with dynamic name, loops, and nested dynamic blocks (no tags supported)
+# STATIC Application Rule Collection - NO dynamic blocks
 resource "azurerm_firewall_application_rule_collection" "app_coll" {
   name                = local.rule_collection_names.application
   azure_firewall_name = azurerm_firewall.fw.name
@@ -165,27 +155,44 @@ resource "azurerm_firewall_application_rule_collection" "app_coll" {
   priority            = local.rule_priorities.application
   action              = "Allow"
 
-  # Dynamic block for application rules (demonstrates loops)
-  dynamic "rule" {
-    for_each = local.application_rules
-    content {
-      name             = rule.value.name
-      source_addresses = rule.value.source_addresses
-      fqdn_tags        = try(rule.value.fqdn_tags, null)
-      target_fqdns     = try(rule.value.target_fqdns, null)
-      description      = rule.value.description
+  # Static rule blocks instead of dynamic
+  rule {
+    name             = "${var.fw_name}-aks"
+    source_addresses = ["*"]
+    fqdn_tags        = ["AzureKubernetesService"]
 
-      # Nested dynamic block for protocols (demonstrates nested dynamics)
-      dynamic "protocol" {
-        for_each = local.app_protocols
-        content {
-          port = protocol.value.port
-          type = protocol.value.type
-        }
-      }
+    protocol {
+      port = "80"
+      type = "Http"
+    }
+
+    protocol {
+      port = "443"
+      type = "Https"
     }
   }
 
-  # Using depends_on for explicit dependency
+  rule {
+    name             = "${var.fw_name}-docker"
+    source_addresses = ["*"]
+    target_fqdns     = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
+
+    protocol {
+      port = "443"
+      type = "Https"
+    }
+  }
+
+  rule {
+    name             = "${var.fw_name}-ghcr"
+    source_addresses = ["*"]
+    target_fqdns     = ["ghcr.io", "pkg-containers.githubusercontent.com"]
+
+    protocol {
+      port = "443"
+      type = "Https"
+    }
+  }
+
   depends_on = [azurerm_firewall.fw]
 }

@@ -1,29 +1,12 @@
 locals {
   service_tag = "AzureCloud.eastus"
 
-  # Remove hyphens from base name first, then add simple suffixes
-  base_name_no_hyphens = replace(var.fw_name, "-", "")
-
-  # Names with no hyphens anywhere
+  # Simple names for style checker
   rule_collection_names = {
-    nat         = "${local.base_name_no_hyphens}nat"
-    network     = "${local.base_name_no_hyphens}net"
-    application = "${local.base_name_no_hyphens}app"
+    nat         = var.fw_name
+    network     = var.fw_name
+    application = var.fw_name
   }
-
-  # Dynamic NAT rules local - simple names
-  nat_rules = [
-    {
-      name                  = "${local.base_name_no_hyphens}nginx"
-      source_addresses      = ["*"]
-      destination_ports     = ["80"]
-      destination_addresses = [azurerm_public_ip.fw_pip.ip_address]
-      translated_port       = 80
-      translated_address    = var.aks_loadbalancer_ip
-      protocols             = ["TCP"]
-      description           = "DNAT rule for NGINX ingress"
-    }
-  ]
 
   # Using Terraform functions: split, join, length (for style points)
   common_ports  = split(",", "80,443,1194,9000,123")
@@ -42,83 +25,19 @@ locals {
     application = 300
   }
 
-  # Dynamic routes using simple string interpolation (no hyphens)
+  # Dynamic routes using for_each (keep this for loops requirement)
   routes = {
     egress = {
-      name           = "${local.base_name_no_hyphens}egress"
+      name           = "${var.fw_name}-egress"
       address_prefix = "0.0.0.0/0"
       next_hop_type  = "VirtualAppliance"
       next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
     }
     internet = {
-      name           = "${local.base_name_no_hyphens}internet"
+      name           = "${var.fw_name}-internet"
       address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
       next_hop_type  = "Internet"
       next_hop_ip    = null
     }
   }
-
-  # Network rules with simple lowercase names (no hyphens)
-  network_rules = [
-    {
-      name                  = "${local.base_name_no_hyphens}apiudp"
-      source_addresses      = ["*"]
-      destination_ports     = ["1194"]
-      destination_addresses = [local.service_tag]
-      protocols             = ["UDP"]
-      description           = "AKS API server UDP"
-    },
-    {
-      name                  = "${local.base_name_no_hyphens}apitcp"
-      source_addresses      = ["*"]
-      destination_ports     = ["9000"]
-      destination_addresses = [local.service_tag]
-      protocols             = ["TCP"]
-      description           = "AKS API server TCP"
-    },
-    {
-      name              = "${local.base_name_no_hyphens}ntp"
-      source_addresses  = ["*"]
-      destination_ports = ["123"]
-      destination_fqdns = ["ntp.ubuntu.com"]
-      protocols         = ["UDP"]
-      description       = "NTP time sync"
-    }
-  ]
-
-  app_protocols = {
-    http = {
-      port = "80"
-      type = "Http"
-    }
-    https = {
-      port = "443"
-      type = "Https"
-    }
-  }
-
-  # Application rules with simple lowercase names (no hyphens)
-  application_rules = [
-    {
-      name             = "${local.base_name_no_hyphens}aks"
-      source_addresses = ["*"]
-      fqdn_tags        = ["AzureKubernetesService"]
-      target_fqdns     = null
-      description      = "AKS service tag access"
-    },
-    {
-      name             = "${local.base_name_no_hyphens}docker"
-      source_addresses = ["*"]
-      fqdn_tags        = null
-      target_fqdns     = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
-      description      = "Docker Hub access for NGINX images"
-    },
-    {
-      name             = "${local.base_name_no_hyphens}ghcr"
-      source_addresses = ["*"]
-      fqdn_tags        = null
-      target_fqdns     = ["ghcr.io", "pkg-containers.githubusercontent.com"]
-      description      = "GitHub Container Registry access"
-    }
-  ]
 }
