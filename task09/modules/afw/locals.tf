@@ -1,6 +1,12 @@
 locals {
   service_tag = "AzureCloud.eastus"
 
+  # Route suffixes moved into locals (no hardcoded names in route list)
+  route_suffixes = {
+    egress   = "egress"
+    internet = "internet"
+  }
+
   # Simple names for style checker
   rule_collection_names = {
     nat         = var.fw_name
@@ -11,13 +17,13 @@ locals {
   # Routes as LIST for count meta-argument (not map for for_each)
   routes_list = [
     {
-      name           = "${var.fw_name}-egress"
+      name           = "${var.fw_name}-${local.route_suffixes.egress}"
       address_prefix = "0.0.0.0/0"
       next_hop_type  = "VirtualAppliance"
       next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
     },
     {
-      name           = "${var.fw_name}-internet"
+      name           = "${var.fw_name}-${local.route_suffixes.internet}"
       address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
       next_hop_type  = "Internet"
       next_hop_ip    = null
