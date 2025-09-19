@@ -32,7 +32,7 @@ variable "fw_snet_prefix" {
   description = "Address prefix for the Azure Firewall subnet"
   default     = "10.0.1.0/24"
   validation {
-    condition     = can(cidrsubnet(var.fw_snet_prefix, 0, 0))  # Using cidrsubnet function
+    condition     = can(cidrsubnet(var.fw_snet_prefix, 0, 0)) # Using cidrsubnet function
     error_message = "Must be a valid CIDR prefix."
   }
 }

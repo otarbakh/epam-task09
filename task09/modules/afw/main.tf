@@ -35,7 +35,7 @@ resource "azurerm_firewall" "fw" {
   sku_tier            = "Standard"
 
   dynamic "ip_configuration" {
-    for_each = [1]  # Dynamic block for IP configuration
+    for_each = [1] # Dynamic block for IP configuration
     content {
       name                 = "configuration"
       subnet_id            = azurerm_subnet.fw_subnet.id
@@ -55,22 +55,22 @@ resource "azurerm_route_table" "rt" {
 locals {
   routes = {
     "egress" = {
-      name          = "to-firewall"
+      name           = "to-firewall"
       address_prefix = "0.0.0.0/0"
-      next_hop_type = "VirtualAppliance"
-      next_hop_ip   = azurerm_firewall.fw.ip_configuration[0].private_ip_address
+      next_hop_type  = "VirtualAppliance"
+      next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
     },
     "internet" = {
-      name          = "to-internet"
+      name           = "to-internet"
       address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
-      next_hop_type = "Internet"
-      next_hop_ip   = null
+      next_hop_type  = "Internet"
+      next_hop_ip    = null
     }
   }
 }
 
 resource "azurerm_route" "fw_routes" {
-  for_each = local.routes  # Using for_each loop
+  for_each = local.routes # Using for_each loop
 
   name                   = each.value.name
   resource_group_name    = var.rg_name
@@ -98,23 +98,23 @@ resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
   dynamic "rule" {
     for_each = [
       {
-        name               = "nginx-dnat"
-        source_addresses   = ["*"]
-        destination_ports  = ["80"]
+        name                  = "nginx-dnat"
+        source_addresses      = ["*"]
+        destination_ports     = ["80"]
         destination_addresses = [azurerm_public_ip.fw_pip.ip_address]
-        translated_port    = 80
-        translated_address = var.aks_loadbalancer_ip
-        protocols          = ["TCP"]
+        translated_port       = 80
+        translated_address    = var.aks_loadbalancer_ip
+        protocols             = ["TCP"]
       }
     ]
     content {
-      name               = rule.value.name
-      source_addresses   = rule.value.source_addresses
-      destination_ports  = rule.value.destination_ports
+      name                  = rule.value.name
+      source_addresses      = rule.value.source_addresses
+      destination_ports     = rule.value.destination_ports
       destination_addresses = rule.value.destination_addresses
-      translated_port    = rule.value.translated_port
-      translated_address = rule.value.translated_address
-      protocols          = rule.value.protocols
+      translated_port       = rule.value.translated_port
+      translated_address    = rule.value.translated_address
+      protocols             = rule.value.protocols
     }
   }
 }
@@ -123,28 +123,28 @@ resource "azurerm_firewall_nat_rule_collection" "nat_coll" {
 locals {
   network_rules = [
     {
-      name               = "api-udp"
-      source_addresses   = ["*"]
-      destination_ports  = ["1194"]
+      name                  = "api-udp"
+      source_addresses      = ["*"]
+      destination_ports     = ["1194"]
       destination_addresses = [local.service_tag]
-      protocols          = ["UDP"]
-      description        = "AKS API server UDP"
+      protocols             = ["UDP"]
+      description           = "AKS API server UDP"
     },
     {
-      name               = "api-tcp"
-      source_addresses   = ["*"]
-      destination_ports  = ["9000"]
+      name                  = "api-tcp"
+      source_addresses      = ["*"]
+      destination_ports     = ["9000"]
       destination_addresses = [local.service_tag]
-      protocols          = ["TCP"]
-      description        = "AKS API server TCP"
+      protocols             = ["TCP"]
+      description           = "AKS API server TCP"
     },
     {
-      name               = "time"
-      source_addresses   = ["*"]
-      destination_ports  = ["123"]
-      destination_fqdns  = ["ntp.ubuntu.com"]
-      protocols          = ["UDP"]
-      description        = "NTP time sync"
+      name              = "time"
+      source_addresses  = ["*"]
+      destination_ports = ["123"]
+      destination_fqdns = ["ntp.ubuntu.com"]
+      protocols         = ["UDP"]
+      description       = "NTP time sync"
     }
   ]
 
@@ -163,13 +163,13 @@ resource "azurerm_firewall_network_rule_collection" "net_coll" {
   dynamic "rule" {
     for_each = local.network_rules
     content {
-      name               = rule.value.name
-      source_addresses   = rule.value.source_addresses
-      destination_ports  = rule.value.destination_ports
+      name                  = rule.value.name
+      source_addresses      = rule.value.source_addresses
+      destination_ports     = rule.value.destination_ports
       destination_addresses = try(rule.value.destination_addresses, null)
-      destination_fqdns  = try(rule.value.destination_fqdns, null)
-      protocols          = rule.value.protocols
-      description        = rule.value.description
+      destination_fqdns     = try(rule.value.destination_fqdns, null)
+      protocols             = rule.value.protocols
+      description           = rule.value.description
     }
   }
 }
@@ -189,25 +189,25 @@ locals {
 
   application_rules = [
     {
-      name        = "aks-fqdn-tag"
+      name             = "aks-fqdn-tag"
       source_addresses = ["*"]
-      fqdn_tags   = ["AzureKubernetesService"]
-      target_fqdns = null
-      description = "AKS service tag access"
+      fqdn_tags        = ["AzureKubernetesService"]
+      target_fqdns     = null
+      description      = "AKS service tag access"
     },
     {
-      name        = "docker-hub"
+      name             = "docker-hub"
       source_addresses = ["*"]
-      fqdn_tags   = null
-      target_fqdns = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
-      description = "Docker Hub access for NGINX images"
+      fqdn_tags        = null
+      target_fqdns     = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
+      description      = "Docker Hub access for NGINX images"
     },
     {
-      name        = "github-container"
+      name             = "github-container"
       source_addresses = ["*"]
-      fqdn_tags   = null
-      target_fqdns = ["ghcr.io", "pkg-containers.githubusercontent.com"]
-      description = "GitHub Container Registry access"
+      fqdn_tags        = null
+      target_fqdns     = ["ghcr.io", "pkg-containers.githubusercontent.com"]
+      description      = "GitHub Container Registry access"
     }
   ]
 }

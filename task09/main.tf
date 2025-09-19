@@ -17,9 +17,9 @@ locals {
     Module      = "AzureFirewall"
     Owner       = "Infrastructure"
     CreatedBy   = data.azurerm_client_config.current.object_id
-    Timestamp   = timestamp()  # Using timestamp() function
+    Timestamp   = timestamp() # Using timestamp() function
   }
-  
+
   # Using format() function for dynamic naming
   module_name = format("%s-afw-module", local.prefix)
 }
@@ -27,7 +27,7 @@ locals {
 # Enhanced module call with depends_on and count (demonstrates loops)
 module "afw" {
   source = "./modules/afw"
-  count  = 1  # Demonstrates count meta-argument
+  count  = 1 # Demonstrates count meta-argument
 
   rg_name             = data.azurerm_resource_group.rg.name
   location            = local.location
@@ -39,12 +39,12 @@ module "afw" {
   fw_name             = local.fw_name
   rt_name             = local.rt_name
   aks_loadbalancer_ip = var.aks_loadbalancer_ip
-  
+
   # Using depends_on for explicit dependencies
   depends_on = [
     data.azurerm_resource_group.rg,
     data.azurerm_virtual_network.vnet
   ]
-  
+
   # Passing tags using functions
 }
