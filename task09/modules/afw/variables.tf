@@ -72,3 +72,8 @@ variable "tags" {
   description = "Tags to apply to resources"
   default     = {}
 }
+
+variable "prefix" {
+  type        = string
+  description = "Common prefix for resource naming"
+}

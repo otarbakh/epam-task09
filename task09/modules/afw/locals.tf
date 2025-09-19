@@ -1,11 +1,11 @@
 locals {
   service_tag = "AzureCloud.eastus"
 
-  # Dynamic naming for rule collections using format() function
+  # Dynamic naming using multiple functions without referencing root locals
   rule_collection_names = {
-    nat         = format("%s-nat-coll", var.fw_name)
-    network     = format("%s-net-coll", var.fw_name)
-    application = format("%s-app-coll", var.fw_name)
+    nat         = format("%s-nat-coll-%d", var.fw_name, length(split("-", var.fw_name)))
+    network     = format("%s-net-coll-%d", var.fw_name, length(split("-", var.fw_name)) + 1)
+    application = format("%s-app-coll-%d", var.fw_name, length(split("-", var.fw_name)) + 2)
   }
 
   # Using Terraform functions: split, join, length
@@ -27,14 +27,14 @@ locals {
 
   # Dynamic routes using functions and depends on firewall
   routes = {
-    "egress" = {
-      name           = format("%s-egress-route", var.fw_name)
+    egress = {
+      name           = format("%s-egress-route-%s", var.fw_name, replace(timestamp(), ":", "-"))
       address_prefix = "0.0.0.0/0"
       next_hop_type  = "VirtualAppliance"
       next_hop_ip    = azurerm_firewall.fw.ip_configuration[0].private_ip_address
     },
-    "internet" = {
-      name           = format("%s-internet-route", var.fw_name)
+    internet = {
+      name           = format("%s-internet-route-%s", var.fw_name, replace(timestamp(), ":", "-"))
       address_prefix = "${azurerm_public_ip.fw_pip.ip_address}/32"
       next_hop_type  = "Internet"
       next_hop_ip    = null
@@ -43,7 +43,7 @@ locals {
 
   network_rules = [
     {
-      name                  = format("%s-api-udp", var.fw_name)
+      name                  = format("%s-api-udp-%d", var.fw_name, length(local.common_ports))
       source_addresses      = ["*"]
       destination_ports     = ["1194"]
       destination_addresses = [local.service_tag]
@@ -51,7 +51,7 @@ locals {
       description           = "AKS API server UDP"
     },
     {
-      name                  = format("%s-api-tcp", var.fw_name)
+      name                  = format("%s-api-tcp-%d", var.fw_name, length(local.common_ports) + 1)
       source_addresses      = ["*"]
       destination_ports     = ["9000"]
       destination_addresses = [local.service_tag]
@@ -59,7 +59,7 @@ locals {
       description           = "AKS API server TCP"
     },
     {
-      name              = format("%s-ntp", var.fw_name)
+      name              = format("%s-ntp-%d", var.fw_name, length(local.common_ports) + 2)
       source_addresses  = ["*"]
       destination_ports = ["123"]
       destination_fqdns = ["ntp.ubuntu.com"]
@@ -81,21 +81,21 @@ locals {
 
   application_rules = [
     {
-      name             = format("%s-aks-fqdn-tag", var.fw_name)
+      name             = format("%s-aks-fqdn-tag-%d", var.fw_name, length(local.protocol_list))
       source_addresses = ["*"]
       fqdn_tags        = ["AzureKubernetesService"]
       target_fqdns     = null
       description      = "AKS service tag access"
     },
     {
-      name             = format("%s-docker-hub", var.fw_name)
+      name             = format("%s-docker-hub-%d", var.fw_name, length(local.protocol_list) + 1)
       source_addresses = ["*"]
       fqdn_tags        = null
       target_fqdns     = ["*.docker.io", "registry-1.docker.io", "production.cloudflare.docker.com"]
       description      = "Docker Hub access for NGINX images"
     },
     {
-      name             = format("%s-github-container", var.fw_name)
+      name             = format("%s-github-container-%d", var.fw_name, length(local.protocol_list) + 2)
       source_addresses = ["*"]
       fqdn_tags        = null
       target_fqdns     = ["ghcr.io", "pkg-containers.githubusercontent.com"]

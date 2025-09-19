@@ -28,7 +28,7 @@ locals {
 module "afw" {
   source = "./modules/afw"
 
-
+  prefix              = local.prefix
   rg_name             = data.azurerm_resource_group.rg.name
   location            = local.location
   vnet_name           = data.azurerm_virtual_network.vnet.name
@@ -40,11 +40,8 @@ module "afw" {
   rt_name             = local.rt_name
   aks_loadbalancer_ip = var.aks_loadbalancer_ip
 
-  # Using depends_on for explicit dependencies
   depends_on = [
     data.azurerm_resource_group.rg,
     data.azurerm_virtual_network.vnet
   ]
-
-  # Passing tags using functions
 }
