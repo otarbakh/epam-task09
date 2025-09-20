@@ -26,17 +26,20 @@ locals {
 
 # Enhanced module call with depends_on and count (demonstrates loops)
 module "afw" {
-  source              = "./modules/afw"
-  rg_name             = data.azurerm_resource_group.rg.name
-  location            = local.location
-  vnet_name           = data.azurerm_virtual_network.vnet.name
-  aks_snet_name       = local.aks_snet_name
-  fw_snet_prefix      = local.fw_snet_prefix
-  fw_snet_name        = local.fw_snet_name
-  fw_pip_name         = local.fw_pip_name
-  fw_name             = local.fw_name
-  rt_name             = local.rt_name
-  aks_loadbalancer_ip = var.aks_loadbalancer_ip
+  source                = "./modules/afw"
+  rg_name               = data.azurerm_resource_group.rg.name
+  location              = local.location
+  vnet_name             = data.azurerm_virtual_network.vnet.name
+  aks_snet_name         = local.aks_snet_name
+  fw_snet_prefix        = local.fw_snet_prefix
+  fw_snet_name          = local.fw_snet_name
+  fw_pip_name           = local.fw_pip_name
+  fw_name               = local.fw_name
+  rt_name               = local.rt_name
+  aks_loadbalancer_ip   = var.aks_loadbalancer_ip
+  route_suffix_egress   = var.route_suffix_egress
+  route_suffix_internet = var.route_suffix_internet
+
 
   depends_on = [
     data.azurerm_resource_group.rg,
