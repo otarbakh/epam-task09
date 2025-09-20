@@ -38,7 +38,7 @@ locals {
     application = 300
   }
 
-  # Protocols for rules
+
   protocol_list   = ["TCP", "UDP", "Any"]
   protocol_count  = length(local.protocol_list)
   protocol_string = join(" | ", local.protocol_list)
